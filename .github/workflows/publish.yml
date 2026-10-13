@@ -1,0 +1,48 @@
+name: Publish Flame community names
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '2-57/5 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: flame-names-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check feed validation
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Read complete public snapshot
+        id: snapshot
+        env:
+          PUBLISHED_FEED_URL: ${{ steps.pages.outputs.base_url }}/flame-names.txt
+        run: python3 scripts/publish.py
+      - name: Upload new snapshot
+        if: steps.snapshot.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Publish new snapshot
+        if: steps.snapshot.outputs.changed == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
